@@ -70,12 +70,6 @@ public class HttpProxyInterceptPipeline implements Iterable<HttpProxyIntercept> 
   }
 
   public void beforeRequest(Channel clientChannel, HttpRequest httpRequest, RequestProto requestProto) throws Exception {
-    if (requestProto != null && requestProto.getSsl()){
-      System.out.println(String.format("[SSL]%s", httpRequest.uri()));
-
-    }else {
-      System.out.println(String.format("[HTTP]%s", httpRequest.uri()));
-    }
     if (this.pos1 == 0) {
       this.httpRequest = httpRequest;
     }

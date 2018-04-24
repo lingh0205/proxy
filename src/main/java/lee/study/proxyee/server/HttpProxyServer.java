@@ -10,11 +10,11 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 
-import io.netty.handler.stream.ChunkedWriteHandler;
 import lee.study.proxyee.crt.CertUtil;
 import lee.study.proxyee.exception.HttpProxyExceptionHandle;
 import lee.study.proxyee.handler.HttpProxyServerHandle;
@@ -82,6 +82,7 @@ public class HttpProxyServer {
       serverConfig.setServerPubKey(keyPair.getPublic());
       serverConfig.setLoopGroup(new NioEventLoopGroup());
     }
+
     if (proxyInterceptInitializer == null) {
       proxyInterceptInitializer = new HttpProxyInterceptInitializer();
     }
@@ -126,14 +127,8 @@ public class HttpProxyServer {
             @Override
             protected void initChannel(Channel ch) throws Exception {
               ch.pipeline().addLast("httpCodec", new HttpServerCodec());
-//              ch.pipeline().addLast("decoder", new HttpRequestDecoder());
-//              /**
-//               * http-response解码器
-//               * http服务器端对response编码
-//               */
-//              ch.pipeline().addLast("encoder", new HttpResponseEncoder());
-//
               ch.pipeline().addLast("aggregator", new HttpObjectAggregator(1048576));
+              ch.pipeline().addLast("deflater", new HttpContentCompressor());
               ch.pipeline().addLast("serverHandle",
                   new HttpProxyServerHandle(serverConfig, proxyInterceptInitializer, proxyConfig,
                       httpProxyExceptionHandle));

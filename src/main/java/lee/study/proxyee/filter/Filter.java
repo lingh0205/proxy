@@ -1,15 +1,25 @@
 package lee.study.proxyee.filter;
 
+import lee.study.proxyee.pojo.IgnoreConfig;
+import lee.study.proxyee.util.GlobalProxyConfigUtil;
+
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * @author LinGH
+ * @date 2018-04-24
+ */
 public class Filter {
 
-    public final static List<String> filter = new ArrayList<>();
+    private static List<String> EXT_FILTER = new ArrayList<>();
+    private static List<String> CONTENT_TYPE_FILTER = new ArrayList<>();
 
     static {
-        for (FilterEnum ext : FilterEnum.values()) {
-            filter.add(ext.getValue());
+        IgnoreConfig ignoreConfig = GlobalProxyConfigUtil.getIgnoreConfig();
+        if (ignoreConfig != null){
+            EXT_FILTER = ignoreConfig.getExts();
+            CONTENT_TYPE_FILTER = ignoreConfig.getContentTypes();
         }
     }
 
@@ -19,15 +29,16 @@ public class Filter {
      * @return
      */
     public static boolean ignoreByExtension(String extension){
-        return filter.contains(extension);
+        return EXT_FILTER.contains(extension);
     }
 
     /**
-     * 待实现
+     * 通过content-type过滤
+     * @param contentType
      * @return
      */
-    public static boolean ignoreByContentType(){
-        return false;
+    public static boolean ignoreByContentType(String contentType){
+        return CONTENT_TYPE_FILTER.contains(contentType);
     }
 
 }

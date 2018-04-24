@@ -1,5 +1,9 @@
 package lee.study.proxyee.pojo;
 
+/**
+ * @author LinGH
+ * @date 2018-04-24
+ */
 public enum  CaptureEntity {
 
     ID("_id",0),

@@ -8,9 +8,17 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.InsertManyOptions;
 import lee.study.proxyee.pojo.CaptureEntity;
+import lee.study.proxyee.pojo.GlobalProxyConfig;
+import lee.study.proxyee.pojo.MongoDb;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
+import org.ho.yaml.Yaml;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -21,9 +29,10 @@ public class MongoUtil {
 
     private static String HOST = "10.158.192.8";
     private static int PORT = 15001;
-    private static String USER = "scan";
-    private static String PASSWD = "scanlol66";
+    private static String USER = "***";
+    private static String PASSWD = "***";
     private static String DATABASE = "proxyee";
+    private static boolean ISAUTH = Boolean.TRUE;
 
     private final static String TABLE = "capture";
 
@@ -35,31 +44,31 @@ public class MongoUtil {
 
     private static MongoClient getMonGoConnection() {
         if (mongoClient == null) {
-            List<ServerAddress> addrs = new ArrayList<ServerAddress>();
+            List<ServerAddress> addrs = new ArrayList<>();
             try {
-                try (InputStream stream = MongoUtil.class.getClassLoader().getResourceAsStream("mongo.properties");) {
-                    Properties prop = new Properties();
-                    if (stream!=null) {
-                        prop.load(stream);
-                        HOST = prop.getProperty("mongo.host");
-                        PORT = Integer.valueOf(prop.getProperty("mongo.port"));
-                        USER = prop.getProperty("mongo.user");
-                        PASSWD = prop.getProperty("mongo.passwd");
-                        DATABASE = prop.getProperty("mongo.database");
-                    }
-                    ServerAddress serverAddress = new ServerAddress(HOST, PORT);
-                    addrs.add(serverAddress);
+                MongoDb mongoDbConfig = GlobalProxyConfigUtil.getMongoDbConfig();
+                if (mongoDbConfig!=null) {
+                    HOST = mongoDbConfig.getHost();
+                    PORT = mongoDbConfig.getPort();
+                    USER = mongoDbConfig.getUser();
+                    PASSWD = mongoDbConfig.getPasswd();
+                    DATABASE = mongoDbConfig.getDatabase();
+                    ISAUTH = mongoDbConfig.isAuth();
                 }
+                ServerAddress serverAddress = new ServerAddress(HOST, PORT);
+                addrs.add(serverAddress);
             }catch (Exception e){
                 System.out.println("Failed to Connect to mongo, Cause by : " + e);
             }
 
             MongoCredential credential = MongoCredential.createScramSha1Credential(USER, DATABASE, PASSWD.toCharArray());
-            List<MongoCredential> credentials = new ArrayList<MongoCredential>();
+            List<MongoCredential> credentials = new ArrayList<>();
             credentials.add(credential);
-
-//            mongoClient = new MongoClient(addrs, credentials);
-            mongoClient = new MongoClient( HOST, PORT );
+            if (ISAUTH) {
+                mongoClient = new MongoClient(addrs, credentials);
+            }else {
+                mongoClient = new MongoClient(HOST, PORT);
+            }
         }
         return mongoClient;
     }
@@ -97,8 +106,8 @@ public class MongoUtil {
                 FindIterable<Document> documents = collection.find(doc);
                 Document first = documents.first();
                 if (first != null) {
-                    document.putAll(first);
-                    Document update = new Document("$set", document);
+                    first.putAll(document);
+                    Document update = new Document("$set", first);
                     collection.updateOne(doc, update);
                 } else {
                     collection.insertOne(document);
@@ -115,11 +124,11 @@ public class MongoUtil {
         return documents.first();
     }
 
-    public static void main(String[] args){
-        connect();
-        FindIterable<Document> documents = collection.find(new Document(CaptureEntity.ID.getCname(), new Document("$eq", "1524228250277-78a6762a-c04d-43fb-9ebe-f6dda2ad8e45")));
-        FindIterable<Document> docs = collection.find(new Document(CaptureEntity.ID.getCname(), new Document("$eq", documents.first().get(CaptureEntity.ID.getCname()))));
-        System.out.println(docs.first());
+    public static void main(String[] args) throws FileNotFoundException, MalformedURLException {
+        URL url = Thread.currentThread().getContextClassLoader().getResource("");
+        String path = url.getPath();
+        File file = new File(path + "/config.yml");
+        GlobalProxyConfig proxyConfig = Yaml.loadType(file, GlobalProxyConfig.class);
     }
 
 }

@@ -1,0 +1,26 @@
+mongodb:
+  host: 10.158.192.8
+  port: 15001
+  user: ***
+  passwd: ***
+  database: proxyee
+  isAuth: false
+
+ignore:
+  exts:
+    - ext: .js
+    - ext: .jpg
+    - ext: .png
+    - ext: .giff
+    - ext: .jpeg
+    - ext: .gif
+    - ext: .ico
+    - ext: .mp4
+    - ext: .api
+    - ext: .flv
+    - ext: .css
+
+  contentTypes:
+    - key: image/png
+    - key: text/javascript; charset=UTF-8
+    - key: application/javascript; charset=UTF-8

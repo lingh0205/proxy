@@ -16,9 +16,16 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * @author LinGH
+ * @date 2018-04-24
+ */
 public class HttpRecordIntercept extends HttpProxyIntercept {
 
     private String token;
+    private StringBuilder req = new StringBuilder();
+    private StringBuilder resp = new StringBuilder();
+    private Document document = new Document();
 
     private final static ExecutorService executorService = Executors.newFixedThreadPool(10);
     private final static String IGNORE = "IGNORE";
@@ -29,12 +36,15 @@ public class HttpRecordIntercept extends HttpProxyIntercept {
 
     @Override
     public void beforeRequest(Channel clientChannel, HttpRequest httpRequest,ProtoUtil.RequestProto requestProto, HttpProxyInterceptPipeline pipeline) throws Exception {
-        Document document = new Document();
         URI uri = new URI(httpRequest.uri());
         String path = uri.getPath();
-        if (StringUtils.isNotBlank(path) && path.contains(".")){
-            document.put(CaptureEntity.EXTENSION.getCname(), path.substring(path.indexOf('.',-1)));
+        if (StringUtils.isNotBlank(path) && path.substring(path.lastIndexOf("/")).contains(".")){
+            String ext = path.substring(path.lastIndexOf("/"));
+            document.put(CaptureEntity.EXTENSION.getCname(), ext.substring(ext.lastIndexOf('.')));
+        }else {
+            document.put(CaptureEntity.EXTENSION.getCname(), "/");
         }
+        // filter by ext
         if (Filter.ignoreByExtension(document.getString(CaptureEntity.EXTENSION.getCname()))){
             this.token = String.format("%s-%s", this.token, IGNORE);
         }else {
@@ -56,11 +66,10 @@ public class HttpRecordIntercept extends HttpProxyIntercept {
             document.put(CaptureEntity.PATH.getCname(), path);
             document.put(CaptureEntity.REQUEST_HEADER.getCname(), convert2Document(httpRequest.headers()));
             if (httpRequest instanceof FullHttpRequest) {
-                document.put(CaptureEntity.REQUEST_CONTENT.getCname(), HexUtil.bytes2hex03(((FullHttpRequest) httpRequest).content().array()));
+                document.put(CaptureEntity.REQUEST_CONTENT.getCname(), HexUtil.bytes2hex03(((FullHttpRequest) httpRequest).content()));
             }
 
             document.put(CaptureEntity.DATE_START.getCname(), new Date());
-            executorService.submit(new RequestTask(document));
         }
         pipeline.beforeRequest(clientChannel, httpRequest, requestProto);
     }
@@ -75,23 +84,29 @@ public class HttpRecordIntercept extends HttpProxyIntercept {
 
     @Override
     public void beforeRequest(Channel clientChannel, HttpContent httpContent, ProtoUtil.RequestProto requestProto, HttpProxyInterceptPipeline pipeline) throws Exception {
+        if (httpContent instanceof DefaultHttpContent && ! this.token.endsWith(IGNORE)){
+            DefaultHttpContent defaultHttpContent = (DefaultHttpContent) httpContent;
+            req.append(HexUtil.bytes2hex03(defaultHttpContent.content()));
+        }else if (! this.token.endsWith(IGNORE)  && httpContent instanceof LastHttpContent) {
+            document.put(CaptureEntity.REQUEST_CONTENT.getCname(), req.toString());
+        }
         super.beforeRequest(clientChannel, httpContent, requestProto, pipeline);
     }
 
     @Override
     public void afterResponse(Channel clientChannel, Channel proxyChannel, HttpResponse httpResponse, HttpProxyInterceptPipeline pipeline) throws Exception {
-        Document document = new Document();
-        if ( ! this.token.endsWith(IGNORE)){
-            document.put(CaptureEntity.ID.getCname(), this.token);
+        String contentType = httpResponse.headers().get("Content-Type");
+        // filter by ext or content-type
+        if ( ! this.token.endsWith(IGNORE) && ! Filter.ignoreByContentType(contentType)){
             document.put(CaptureEntity.STATUS_CODE.getCname(), httpResponse.getStatus().code());
-            document.put(CaptureEntity.CONTENT_TYPE.getCname(), httpResponse.headers().get("Content-Type"));
-            document.put(CaptureEntity.CONTENT_LENGTH.getCname(), httpResponse.headers().get("Content-Length"));
+            document.put(CaptureEntity.CONTENT_TYPE.getCname(), contentType);
+            document.put(CaptureEntity.CONTENT_LENGTH.getCname(),  httpResponse.headers().get("Content-Length"));
             document.put(CaptureEntity.HEADER.name(),convert2Document(httpResponse.headers()));
-            if (httpResponse instanceof FullHttpResponse) {
-                document.put(CaptureEntity.REQUEST_CONTENT.getCname(), HexUtil.bytes2hex03(((FullHttpResponse)httpResponse).content().array()));
-            }
             document.put(CaptureEntity.DATE_END.getCname(), new Date());
-            executorService.submit(new ResponseTask(document));
+        }else {
+            if (!this.token.endsWith(IGNORE)){
+                this.token = String.format("%s-%s", this.token, IGNORE);
+            }
         }
         httpResponse.headers().add("intercept", "test");
         pipeline.afterResponse(clientChannel, proxyChannel, httpResponse);
@@ -99,47 +114,30 @@ public class HttpRecordIntercept extends HttpProxyIntercept {
 
     @Override
     public void afterResponse(Channel clientChannel, Channel proxyChannel, HttpContent httpContent, HttpProxyInterceptPipeline pipeline) throws Exception {
-        super.afterResponse(clientChannel, proxyChannel, httpContent, pipeline);
-    }
-}
-
-class RequestTask implements Runnable{
-
-    private Document document ;
-
-    public RequestTask(Document document){
-        this.document = document;
-    }
-
-    @Override
-    public void run() {
-        try {
-            MongoUtil.save2Capture(document);
-        }catch (Exception e){
-            e.printStackTrace();
+        if (! this.token.endsWith(IGNORE) && httpContent instanceof DefaultHttpContent){
+            DefaultHttpContent defaultHttpContent = (DefaultHttpContent) httpContent;
+            resp.append(HexUtil.bytes2hex03(defaultHttpContent.content()));
+        }else if (! this.token.endsWith(IGNORE)  && httpContent instanceof LastHttpContent) {
+            document.put(CaptureEntity.ID.getCname(), this.token);
+            document.put(CaptureEntity.CONTENT.getCname(), resp.toString());
+            document.put(CaptureEntity.DATE_END.getCname(), new Date());
+            executorService.submit(new InsertDocumentTask(document));
         }
+        pipeline.afterResponse(clientChannel, proxyChannel, httpContent);
     }
 }
 
-class ResponseTask implements Runnable{
+class InsertDocumentTask implements Runnable{
 
     private Document document ;
 
-    public ResponseTask(Document document){
+    public InsertDocumentTask(Document document){
         this.document = document;
     }
 
     @Override
     public void run() {
-        long start = System.currentTimeMillis();
         try {
-            while (MongoUtil.find(document) == null) {
-                if (System.currentTimeMillis() - start > 100){
-                    //超时，直接丢弃
-                    return;
-                }
-                Thread.sleep(10);
-            }
             MongoUtil.save2Capture(document);
         }catch (Exception e){
             e.printStackTrace();
