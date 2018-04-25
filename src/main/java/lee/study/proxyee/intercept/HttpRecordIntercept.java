@@ -1,13 +1,16 @@
 package lee.study.proxyee.intercept;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.*;
 import lee.study.proxyee.filter.Filter;
 import lee.study.proxyee.pojo.CaptureEntity;
+import lee.study.proxyee.util.GZIPUtil;
 import lee.study.proxyee.util.HexUtil;
 import lee.study.proxyee.util.MongoUtil;
 import lee.study.proxyee.util.ProtoUtil;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
 import org.bson.Document;
 import java.net.URI;
 import java.util.Date;
@@ -15,12 +18,15 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * @author LinGH
  * @date 2018-04-24
  */
 public class HttpRecordIntercept extends HttpProxyIntercept {
+
+    private final static Logger LOGGER = Logger.getLogger(HttpRecordIntercept.class);
 
     private String token;
     private StringBuilder req = new StringBuilder();
@@ -29,6 +35,10 @@ public class HttpRecordIntercept extends HttpProxyIntercept {
 
     private final static ExecutorService executorService = Executors.newFixedThreadPool(10);
     private final static String IGNORE = "IGNORE";
+
+    private boolean isGzip;
+    private int contentLength = 0;
+    private byte[] body = new byte[contentLength];
 
     public HttpRecordIntercept(){
         this.token = String.format("%d-%s", System.currentTimeMillis(), UUID.randomUUID().toString());
@@ -64,6 +74,7 @@ public class HttpRecordIntercept extends HttpProxyIntercept {
                 document.put(CaptureEntity.SCHEME.getCname(), uri.getScheme());
             }
             document.put(CaptureEntity.PATH.getCname(), path);
+
             document.put(CaptureEntity.REQUEST_HEADER.getCname(), convert2Document(httpRequest.headers()));
             if (httpRequest instanceof FullHttpRequest) {
                 document.put(CaptureEntity.REQUEST_CONTENT.getCname(), HexUtil.bytes2hex03(((FullHttpRequest) httpRequest).content()));
@@ -101,6 +112,10 @@ public class HttpRecordIntercept extends HttpProxyIntercept {
             document.put(CaptureEntity.STATUS_CODE.getCname(), httpResponse.getStatus().code());
             document.put(CaptureEntity.CONTENT_TYPE.getCname(), contentType);
             document.put(CaptureEntity.CONTENT_LENGTH.getCname(),  httpResponse.headers().get("Content-Length"));
+            String encoding = httpResponse.headers().getAsString("Content-Encoding");
+            if (StringUtils.isNotBlank(encoding) && encoding.contains("gzip")){
+                isGzip = Boolean.TRUE;
+            }
             document.put(CaptureEntity.HEADER.name(),convert2Document(httpResponse.headers()));
             document.put(CaptureEntity.DATE_END.getCname(), new Date());
         }else {
@@ -116,31 +131,63 @@ public class HttpRecordIntercept extends HttpProxyIntercept {
     public void afterResponse(Channel clientChannel, Channel proxyChannel, HttpContent httpContent, HttpProxyInterceptPipeline pipeline) throws Exception {
         if (! this.token.endsWith(IGNORE) && httpContent instanceof DefaultHttpContent){
             DefaultHttpContent defaultHttpContent = (DefaultHttpContent) httpContent;
-            resp.append(HexUtil.bytes2hex03(defaultHttpContent.content()));
+            ByteBuf byteBuf = defaultHttpContent.content();
+            if (isGzip){
+                int extLength = byteBuf.writerIndex() - byteBuf.readerIndex();
+                if (extLength != 0) {
+                    byte[] newBody = new byte[contentLength + extLength];
+                    byte[] temp = new byte[extLength];
+                    ByteBuf copy = null;
+                    try{
+                        copy = byteBuf.copy();
+                        copy.readBytes(temp);
+                        //ԭ���ݿ���
+                        System.arraycopy(body, 0, newBody, 0, contentLength);
+                        //�����ݿ���
+                        System.arraycopy(temp, 0, newBody, contentLength, temp.length);
+                        body = newBody;
+                        contentLength = body.length;
+                    }finally {
+                        if (copy != null){
+                            copy.release();
+                        }
+                    }
+                }
+            }else {
+                resp.append(HexUtil.bytes2hex03(byteBuf));
+            }
         }else if (! this.token.endsWith(IGNORE)  && httpContent instanceof LastHttpContent) {
             document.put(CaptureEntity.ID.getCname(), this.token);
-            document.put(CaptureEntity.CONTENT.getCname(), resp.toString());
+
             document.put(CaptureEntity.DATE_END.getCname(), new Date());
+            if (isGzip){
+                document.put(CaptureEntity.CONTENT.getCname(), GZIPUtil.uncompressToString(body));
+            }else {
+                document.put(CaptureEntity.CONTENT.getCname(), resp.toString());
+            }
             executorService.submit(new InsertDocumentTask(document));
         }
         pipeline.afterResponse(clientChannel, proxyChannel, httpContent);
     }
-}
 
-class InsertDocumentTask implements Runnable{
+    class InsertDocumentTask implements Runnable{
 
-    private Document document ;
+        private Document document ;
 
-    public InsertDocumentTask(Document document){
-        this.document = document;
-    }
+        public InsertDocumentTask(Document document){
+            this.document = document;
+        }
 
-    @Override
-    public void run() {
-        try {
-            MongoUtil.save2Capture(document);
-        }catch (Exception e){
-            e.printStackTrace();
+        @Override
+        public void run() {
+            try {
+                MongoUtil.save2Capture(document);
+            }catch (Exception e){
+                LOGGER.error("Failed to save data to mongodb for url : " + document.getString(CaptureEntity.URL.getCname()), e);
+            }
         }
     }
+
 }
+
+

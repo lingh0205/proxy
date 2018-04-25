@@ -20,8 +20,11 @@ import lee.study.proxyee.exception.HttpProxyExceptionHandle;
 import lee.study.proxyee.handler.HttpProxyServerHandle;
 import lee.study.proxyee.intercept.*;
 import lee.study.proxyee.proxy.ProxyConfig;
+import org.apache.log4j.Logger;
 
 public class HttpProxyServer {
+
+  private final static Logger LOGGER = Logger.getLogger(HttpProxyServer.class);
 
   //http代理隧道握手成功
   public final static HttpResponseStatus SUCCESS = new HttpResponseStatus(200,
@@ -128,7 +131,7 @@ public class HttpProxyServer {
             protected void initChannel(Channel ch) throws Exception {
               ch.pipeline().addLast("httpCodec", new HttpServerCodec());
               ch.pipeline().addLast("aggregator", new HttpObjectAggregator(1048576));
-              ch.pipeline().addLast("deflater", new HttpContentCompressor());
+//              ch.pipeline().addLast("deflater", new HttpContentCompressor());
               ch.pipeline().addLast("serverHandle",
                   new HttpProxyServerHandle(serverConfig, proxyInterceptInitializer, proxyConfig,
                       httpProxyExceptionHandle));
@@ -152,7 +155,7 @@ public class HttpProxyServer {
   }
 
   public static void main(String[] args) throws Exception {
-
+    LOGGER.info("Start to proxy at address 127.0.0.1:1080");
     new HttpProxyServer().proxyInterceptInitializer(new HttpProxyInterceptInitializer() {
           @Override
           public void init(HttpProxyInterceptPipeline pipeline) {
@@ -163,11 +166,13 @@ public class HttpProxyServer {
         .httpProxyExceptionHandle(new HttpProxyExceptionHandle() {
           @Override
           public void beforeCatch(Channel clientChannel, Throwable cause) throws Exception {
+
           }
 
           @Override
           public void afterCatch(Channel clientChannel, Channel proxyChannel, Throwable cause)
               throws Exception {
+            LOGGER.error("Failed to handler proxy request, Cause by : ", cause);
           }
         })
         .start(1080);

@@ -86,6 +86,7 @@ public class HttpProxyServerHandle extends ChannelInboundHandlerAdapter {
               HttpProxyServer.SUCCESS);
           ctx.writeAndFlush(response);
           ctx.channel().pipeline().remove("httpCodec");
+          ctx.channel().pipeline().remove("aggregator");
           return;
         }
       }

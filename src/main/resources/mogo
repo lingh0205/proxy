@@ -1,5 +1,0 @@
-mongo.host = 10.158.192.8
-mongo.port = 15000
-mongo.user = scan
-mongo.passwd = scanlol66
-mongo.database = proxyee
