@@ -35,7 +35,6 @@ public class TestServer {
 
   static {
     try {
-      //注册BouncyCastleProvider加密库
       Security.addProvider(new BouncyCastleProvider());
       if (serverConfig == null) {
         serverConfig = new HttpProxyServerConfig();
@@ -44,15 +43,11 @@ public class TestServer {
                 .build());
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         X509Certificate certificate = CertUtil.loadCert(classLoader.getResourceAsStream("ca.crt"));
-        //读取CA证书使用者信息
         serverConfig.setIssuer(CertUtil.getSubject(certificate));
-        //读取CA证书有效时段(server证书有效期超出CA证书的，在手机上会提示证书不安全)
         serverConfig.setCaNotBefore(certificate.getNotBefore());
         serverConfig.setCaNotAfter(certificate.getNotAfter());
-        //CA私钥用于给动态生成的网站SSL证书签证
         serverConfig
             .setCaPriKey(CertUtil.loadPriKey(classLoader.getResourceAsStream("ca_private.der")));
-        //生产一对随机公私钥用于网站SSL证书动态创建
         KeyPair keyPair = CertUtil.genKeyPair();
         serverConfig.setServerPriKey(keyPair.getPrivate());
         serverConfig.setServerPubKey(keyPair.getPublic());

@@ -8,7 +8,6 @@ import io.netty.handler.proxy.ProxyHandler;
 import lee.study.proxyee.exception.HttpProxyExceptionHandle;
 
 /**
- * http代理隧道，转发原始报文
  */
 public class TunnelProxyInitializer extends ChannelInitializer {
 

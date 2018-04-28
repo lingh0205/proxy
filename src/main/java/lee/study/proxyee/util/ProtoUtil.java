@@ -6,15 +6,22 @@ import java.io.Serializable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * @author LinGH
+ */
 public class ProtoUtil {
+
+
+  private static final Pattern PATTERN_HOST = Pattern.compile("^(?:https?://)?(?<host>[^/]*)/?.*$");
+
+  private static final Pattern PATTERN_PORT = Pattern.compile("^(?:https?://)?(?<host>[^:]*)(?::(?<port>\\d+))?$");
 
   public static RequestProto getRequestProto(HttpRequest httpRequest) {
     RequestProto requestProto = new RequestProto();
     int port = -1;
     String hostStr = httpRequest.headers().get(HttpHeaderNames.HOST);
     if(hostStr==null){
-      Pattern pattern = Pattern.compile("^(?:https?://)?(?<host>[^/]*)/?.*$");
-      Matcher matcher = pattern.matcher(httpRequest.uri());
+      Matcher matcher = PATTERN_HOST.matcher(httpRequest.uri());
       if(matcher.find()){
         hostStr = matcher.group("host");
       }else{
@@ -22,15 +29,13 @@ public class ProtoUtil {
       }
     }
     String uriStr = httpRequest.uri();
-    Pattern pattern = Pattern.compile("^(?:https?://)?(?<host>[^:]*)(?::(?<port>\\d+))?$");
-    Matcher matcher = pattern.matcher(hostStr);
-    //先从host上取端口号没取到再从uri上取端口号 issues#4
+    Matcher matcher = PATTERN_PORT.matcher(hostStr);
     String portTemp = null;
     if (matcher.find()) {
       requestProto.setHost(matcher.group("host"));
       portTemp = matcher.group("port");
       if (portTemp == null) {
-        matcher = pattern.matcher(uriStr);
+        matcher = PATTERN_PORT.matcher(uriStr);
         if (matcher.find()) {
           portTemp = matcher.group("port");
         }

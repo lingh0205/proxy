@@ -13,12 +13,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
 import org.bson.Document;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.zip.GZIPOutputStream;
 
 /**
  * @author LinGH
@@ -46,7 +46,7 @@ public class HttpRecordIntercept extends HttpProxyIntercept {
 
     @Override
     public void beforeRequest(Channel clientChannel, HttpRequest httpRequest,ProtoUtil.RequestProto requestProto, HttpProxyInterceptPipeline pipeline) throws Exception {
-        URI uri = new URI(httpRequest.uri());
+        URI uri = new URI(URLEncoder.encode(httpRequest.uri(), "UTF-8"));
         String path = uri.getPath();
         if (StringUtils.isNotBlank(path) && path.substring(path.lastIndexOf("/")).contains(".")){
             String ext = path.substring(path.lastIndexOf("/"));
@@ -141,9 +141,7 @@ public class HttpRecordIntercept extends HttpProxyIntercept {
                     try{
                         copy = byteBuf.copy();
                         copy.readBytes(temp);
-                        //ԭ���ݿ���
                         System.arraycopy(body, 0, newBody, 0, contentLength);
-                        //�����ݿ���
                         System.arraycopy(temp, 0, newBody, contentLength, temp.length);
                         body = newBody;
                         contentLength = body.length;

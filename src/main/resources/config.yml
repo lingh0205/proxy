@@ -1,3 +1,5 @@
+record: true
+
 mongodb:
   host: 10.158.192.8
   port: 15001

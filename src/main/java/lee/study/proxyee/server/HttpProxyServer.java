@@ -20,13 +20,14 @@ import lee.study.proxyee.exception.HttpProxyExceptionHandle;
 import lee.study.proxyee.handler.HttpProxyServerHandle;
 import lee.study.proxyee.intercept.*;
 import lee.study.proxyee.proxy.ProxyConfig;
+import lee.study.proxyee.util.GlobalProxyConfigUtil;
 import org.apache.log4j.Logger;
 
 public class HttpProxyServer {
 
   private final static Logger LOGGER = Logger.getLogger(HttpProxyServer.class);
-
-  //http代理隧道握手成功
+  private static int PORT = 1080;
+  private static String CONFIG_PATH = null;
   public final static HttpResponseStatus SUCCESS = new HttpResponseStatus(200,
       "Connection established");
 
@@ -45,6 +46,10 @@ public class HttpProxyServer {
     } catch (Exception e) {
       e.printStackTrace();
     }
+  }
+
+  public static final String getConfigPath(){
+    return CONFIG_PATH;
   }
 
   public HttpProxyServer(HttpProxyCACertFactory caCertFactory) {
@@ -72,14 +77,10 @@ public class HttpProxyServer {
         caCert = caCertFactory.getCACert();
         caPriKey = caCertFactory.getCAPriKey();
       }
-      //读取CA证书使用者信息
       serverConfig.setIssuer(CertUtil.getSubject(caCert));
-      //读取CA证书有效时段(server证书有效期超出CA证书的，在手机上会提示证书不安全)
       serverConfig.setCaNotBefore(caCert.getNotBefore());
       serverConfig.setCaNotAfter(caCert.getNotAfter());
-      //CA私钥用于给动态生成的网站SSL证书签证
       serverConfig.setCaPriKey(caPriKey);
-      //生产一对随机公私钥用于网站SSL证书动态创建
       KeyPair keyPair = CertUtil.genKeyPair();
       serverConfig.setServerPriKey(keyPair.getPrivate());
       serverConfig.setServerPubKey(keyPair.getPublic());
@@ -131,7 +132,6 @@ public class HttpProxyServer {
             protected void initChannel(Channel ch) throws Exception {
               ch.pipeline().addLast("httpCodec", new HttpServerCodec());
               ch.pipeline().addLast("aggregator", new HttpObjectAggregator(1048576));
-//              ch.pipeline().addLast("deflater", new HttpContentCompressor());
               ch.pipeline().addLast("serverHandle",
                   new HttpProxyServerHandle(serverConfig, proxyInterceptInitializer, proxyConfig,
                       httpProxyExceptionHandle));
@@ -155,12 +155,28 @@ public class HttpProxyServer {
   }
 
   public static void main(String[] args) throws Exception {
-    LOGGER.info("Start to proxy at address 127.0.0.1:1080");
+    if (args.length == 2){
+      CONFIG_PATH = args[0];
+      PORT = Integer.valueOf(args[1]);
+      LOGGER.info(String.format("Start to proxy at address 127.0.0.1:%d, Using config : %s.", PORT, CONFIG_PATH));
+    }else {
+      LOGGER.info(String.format("Start to proxy at address 127.0.0.1:%d, Using config : default config file.", PORT));
+    }
     new HttpProxyServer().proxyInterceptInitializer(new HttpProxyInterceptInitializer() {
           @Override
           public void init(HttpProxyInterceptPipeline pipeline) {
             pipeline.addLast(new CertDownIntercept());  //处理证书下载
-            pipeline.addLast(new HttpRecordIntercept());
+            if (GlobalProxyConfigUtil.openRecord()) {
+              pipeline.addLast(new HttpRecordIntercept());
+            }else {
+              pipeline.addLast(new HttpProxyIntercept(){
+                @Override
+                public void afterResponse(Channel clientChannel, Channel proxyChannel, HttpResponse httpResponse, HttpProxyInterceptPipeline pipeline) throws Exception {
+                  httpResponse.headers().add("intercept", "proxy response");
+                  pipeline.afterResponse(clientChannel, proxyChannel, httpResponse);
+                }
+              });
+            }
           }
         })
         .httpProxyExceptionHandle(new HttpProxyExceptionHandle() {
@@ -175,7 +191,7 @@ public class HttpProxyServer {
             LOGGER.error("Failed to handler proxy request, Cause by : ", cause);
           }
         })
-        .start(1080);
+        .start(PORT);
   }
 
 }

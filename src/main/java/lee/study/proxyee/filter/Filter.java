@@ -24,7 +24,6 @@ public class Filter {
     }
 
     /**
-     * 通过后缀名进行过滤
      * @param extension
      * @return
      */
@@ -33,7 +32,6 @@ public class Filter {
     }
 
     /**
-     * 通过content-type过滤
      * @param contentType
      * @return
      */

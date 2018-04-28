@@ -20,8 +20,8 @@ public class TestProxyClient {
 
   public static void main(String[] args) throws InterruptedException {
     Bootstrap bootstrap = new Bootstrap();
-    bootstrap.group(new NioEventLoopGroup()) // 注册线程池
-        .channel(NioSocketChannel.class) // 使用NioSocketChannel来作为连接用的channel类
+    bootstrap.group(new NioEventLoopGroup())
+        .channel(NioSocketChannel.class)
         .resolver(NoopAddressResolverGroup.INSTANCE)
         .handler(new ChannelInitializer() {
 

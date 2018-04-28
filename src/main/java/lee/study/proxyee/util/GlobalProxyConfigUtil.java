@@ -3,6 +3,8 @@ package lee.study.proxyee.util;
 import lee.study.proxyee.pojo.GlobalProxyConfig;
 import lee.study.proxyee.pojo.IgnoreConfig;
 import lee.study.proxyee.pojo.MongoDb;
+import lee.study.proxyee.server.HttpProxyServer;
+import org.apache.commons.lang3.StringUtils;
 import org.ho.yaml.Yaml;
 
 import java.io.File;
@@ -14,14 +16,18 @@ public class GlobalProxyConfigUtil {
 
     static {
         try{
+            String configPath = HttpProxyServer.getConfigPath();
             if (globalProxyConfig == null){
-                URL url = Thread.currentThread().getContextClassLoader().getResource("");
-                String path = url.getPath();
-                File file = new File(path + "/config.yml");
+                if (StringUtils.isBlank(configPath)){
+                    URL url = Thread.currentThread().getContextClassLoader().getResource("");
+                    String path = url.getPath();
+                    configPath = path + "/config.yml";
+                }
+                File file = new File(configPath);
                 globalProxyConfig = Yaml.loadType(file, GlobalProxyConfig.class);
             }
         }catch (Exception e){
-
+            e.printStackTrace();
         }
     }
 
@@ -37,6 +43,13 @@ public class GlobalProxyConfigUtil {
             return globalProxyConfig.getIgnore();
         }
         return null;
+    }
+
+    public static Boolean openRecord(){
+        if (globalProxyConfig != null) {
+            return globalProxyConfig.isRecord();
+        }
+        return Boolean.FALSE;
     }
 
 }

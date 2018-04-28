@@ -10,18 +10,15 @@ import com.mongodb.client.model.InsertManyOptions;
 import lee.study.proxyee.pojo.CaptureEntity;
 import lee.study.proxyee.pojo.GlobalProxyConfig;
 import lee.study.proxyee.pojo.MongoDb;
-import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.ho.yaml.Yaml;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 
 public class MongoUtil {
 

@@ -8,34 +8,22 @@ import lee.study.proxyee.util.ProtoUtil;
 
 public class HttpProxyIntercept {
 
-  /**
-   * 拦截代理服务器到目标服务器的请求头
-   */
   public void beforeRequest(Channel clientChannel, HttpRequest httpRequest,ProtoUtil.RequestProto requestProto,
       HttpProxyInterceptPipeline pipeline) throws Exception {
     pipeline.beforeRequest(clientChannel, httpRequest, requestProto);
   }
 
-  /**
-   * 拦截代理服务器到目标服务器的请求体
-   */
   public void beforeRequest(Channel clientChannel, HttpContent httpContent,
                             ProtoUtil.RequestProto requestProto, HttpProxyInterceptPipeline pipeline) throws Exception {
     pipeline.beforeRequest(clientChannel, httpContent, requestProto);
   }
 
-  /**
-   * 拦截代理服务器到客户端的响应头
-   */
   public void afterResponse(Channel clientChannel, Channel proxyChannel, HttpResponse httpResponse,
       HttpProxyInterceptPipeline pipeline) throws Exception {
     pipeline.afterResponse(clientChannel, proxyChannel, httpResponse);
   }
 
 
-  /**
-   * 拦截代理服务器到客户端的响应体
-   */
   public void afterResponse(Channel clientChannel, Channel proxyChannel, HttpContent httpContent,
       HttpProxyInterceptPipeline pipeline)
       throws Exception {
