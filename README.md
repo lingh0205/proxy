@@ -17,3 +17,21 @@ SSL握手
 HTTP通讯
 
 ![HTTP通讯](https://sfault-image.b0.upaiyun.com/114/487/1144878844-59ccbe42037b6_articlex)
+
+### 配置方式
+#### 默认参数方式
+默认方式启动，代理将工作在1080端口，并且由于mongodb相关配置未修改，请求数据无法入库
+
+#### 自定义参数
+通过修改config.yml中的record属性为true，可以启用请求数据入库功能，所有的流量数据将存储在config.yml中配置的mongodb中，请正确配置mongodb的连接信息，各参数定义如下：
+- record : 
+    - true -> 流量入库
+    - false -> 流量不入库
+- host : mongodb 服务器ip
+- port : mongodb 服务开放端口
+- user : mongodb 登录用户
+- passwd : mongodb 登录密码
+- database : 流量库库名
+- isAuth : 是否启用mongodb认证，若配置为false，则 user/passwd 配置不生效
+
+config.yml 中 ignore 部分可以配置后缀名和content-type过滤，过滤后的请求数据不会入库 
